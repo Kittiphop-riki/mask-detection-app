@@ -4,10 +4,9 @@ from PIL import Image
 import streamlit as st
 from ultralytics import YOLO
 
-# โหลดโมเดลที่คุณเทรนเสร็จแล้ว (ให้เอาไฟล์ best.pt มาไว้ในโฟลเดอร์เดียวกัน หรือระบุ path ให้ถูกต้อง)
+# โหลดโมเดลที่คุณเทรนเสร็จแล้ว (ใช้แคชเพื่อความรวดเร็ว)
 @st.cache_resource
 def load_model():
-    # เปลี่ยน 'best.pt' เป็น path ของโมเดลที่คุณเทรนเสร็จ
     return YOLO('best.pt')
 
 try:
@@ -44,8 +43,6 @@ if option == "อัปโหลดรูปภาพ":
             st.image(image_np, caption="ภาพที่อัปโหลด (ยังไม่ได้โหลดโมเดล)", use_container_width=True)
 
 elif option == "ถ่ายภาพจากกล้อง":
-    
-    
     # Widget ถ่ายภาพจากกล้อง
     camera_image = st.camera_input("กดปุ่มเพื่อถ่ายภาพตรวจสอบ")
 
@@ -65,19 +62,3 @@ elif option == "ถ่ายภาพจากกล้อง":
             st.success("ตรวจจับสำเร็จ!")
         else:
             st.image(cv2_img, caption="ภาพจากกล้อง (ยังไม่ได้โหลดโมเดล)", use_container_width=True)
-
-            
-
-
-
-            from ultralytics import YOLO
-
-# โหลดโมเดลที่เราเทรนเสร็จแล้ว (ระบุชื่อไฟล์ best.pt ให้ตรงกับที่เอามาวาง)
-model = YOLO('best.pt')
-
-# ตัวอย่างเวลาจะนำภาพจากกล้องมาทำนายผล
-if camera_image is not None:
-    # แปลงภาพจากสตรีมมาให้โมเดล YOLO ทำนาย
-    results = model(cv2_img) # หรือตัวแปรภาพที่คุณแปลงไว้
-
-print("ตรวจจับสำเร็จ!")
