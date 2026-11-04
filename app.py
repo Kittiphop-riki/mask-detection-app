@@ -53,7 +53,7 @@ def create_donut_chart(percentage, title_text):
 def process_and_display(image_np):
     if 'model' in globals():
         # ปรับ conf เป็น 0.35 เพื่อกรองกล่องขยะ/เสื้อผ้าออก (สามารถปรับขึ้นลงได้ตามความเหมาะสม)
-        results = model(image_np, conf=0.35, imgsz=640)
+        results = model(image_np, conf=0.1, imgsz=640)
         
         boxes = results[0].boxes
         class_names = results[0].names
