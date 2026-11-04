@@ -3,8 +3,9 @@ import numpy as np
 from PIL import Image
 import streamlit as st
 from ultralytics import YOLO
+import plotly.graph_objects as go
 
-# โหลดโมเดลที่คุณเทรนเสร็จแล้ว (ใช้แคชเพื่อความรวดเร็ว)
+# โหลดโมเดล (ใช้แคชเพื่อความเร็ว)
 @st.cache_resource
 def load_model():
     return YOLO('best.pt')
@@ -12,53 +13,126 @@ def load_model():
 try:
     model = load_model()
 except Exception as e:
-    st.warning("ยังไม่พบไฟล์โมเดล 'best.pt' กรุณาเทรนโมเดลและนำไฟล์มาใส่ก่อนครับ")
+    st.warning("ยังไม่พบไฟล์โมเดล 'best.pt' กรุณาตรวจสอบไฟล์โมเดลอีกครั้งครับ")
 
-st.title("🏥 Mask Compliance Detection in High-Risk Hospital")
-st.write("ระบบตรวจสอบการสวมหน้ากากอนามัยสำหรับแผนกความเสี่ยงสูง")
+st.title("🏥 Mask Compliance & Disease Risk Assessment")
+st.write("ระบบประเมินความเสี่ยงโรคติดต่อทางเดินหายใจจากพฤติกรรมการสวมหน้ากากอนามัย")
 
 # เมนูด้านข้างสำหรับเลือกโหมดการทำงาน
 option = st.sidebar.selectbox(
     "เลือกวิธีการทดสอบระบบ", ("ถ่ายภาพจากกล้อง", "อัปโหลดรูปภาพ")
 )
 
+# ฟังก์ชันสร้างกราฟวงกลมโดนัทแสดงเปอร์เซ็นต์
+def create_donut_chart(percentage, title_text):
+    fig = go.Figure(data=[go.Pie(
+        values=[percentage, 100 - percentage],
+        labels=["ความเสี่ยง", "ปลอดภัย"],
+        hole=0.75,  # ขนาดรูตรงกลางโดนัท
+        marker=dict(colors=['#00a8cc', '#e4e4e4']), # สีฟ้าความเสี่ยง และสีเทาพื้นหลัง
+        textinfo='none', # ไม่แสดงข้อความบนชิ้นเค้ก
+        hoverinfo='skip'
+    )])
+    
+    # ใส่ตัวเลขเปอร์เซ็นต์ไว้ตรงกลางวงกลม
+    fig.update_layout(
+        title_text=title_text,
+        title_x=0.5,
+        title_font_size=14,
+        annotations=[dict(
+            text=f"<b>{percentage}%</b>",
+            x=0.5, y=0.5,
+            font_size=20,
+            showarrow=False,
+            font_color="#1f77b4"
+        )],
+        showlegend=False,
+        margin=dict(t=40, b=10, l=10, r=10),
+        height=180,
+        width=180
+    )
+    return fig
+
+def process_and_display(image_np):
+    if 'model' in globals():
+        # ให้โมเดล YOLOv8 ทำนายผล
+        results = model(image_np)
+        res_plotted = results[0].plot() # วาดกล่อง Bounding Box
+        
+        # นับจำนวนและวิเคราะห์คลาส
+        boxes = results[0].boxes
+        class_names = results[0].names
+        
+        mask_count = 0
+        no_mask_count = 0
+        
+        if boxes is not None and len(boxes) > 0:
+            for cls_id in boxes.cls:
+                name = class_names[int(cls_id)].lower()
+                if 'no' in name or 'without' in name or 'not' in name:
+                    no_mask_count += 1
+                else:
+                    mask_count += 1
+                    
+        total_people = mask_count + no_mask_count
+        
+        # แปลงสีสำหรับแสดงผลบน Streamlit
+        res_plotted_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
+        st.image(res_plotted_rgb, caption="ผลการตรวจจับการสวมหน้ากาก", use_container_width=True)
+        
+        # แสดงผลสรุปจำนวนคน
+        st.markdown("---")
+        st.subheader("📊 สรุปผลการตรวจจับ")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("👥 คนทั้งหมด", f"{total_people} คน")
+        col2.metric("✅ สวมหน้ากาก", f"{mask_count} คน")
+        col3.metric("❌ ไม่สวมหน้ากาก", f"{no_mask_count} คน")
+        
+        # ประเมินความเสี่ยงโรคทางเดินหายใจ (คำนวณเป็นเปอร์เซ็นต์ 0-100)
+        if total_people > 0:
+            unmasked_ratio = no_mask_count / total_people
+            base_risk = int(unmasked_ratio * 100)
+            
+            risk_flu = min(base_risk + (no_mask_count * 5), 100)       
+            risk_rsv = min(base_risk + (no_mask_count * 4), 100)       
+            risk_tb = min(int(base_risk * 0.9 + (no_mask_count * 6)), 100)  
+            risk_pneumonia = min(base_risk + (no_mask_count * 4), 100) 
+            risk_pertussis = min(int(base_risk * 0.8 + (no_mask_count * 4)), 100) 
+        else:
+            risk_flu = risk_rsv = risk_tb = risk_pneumonia = risk_pertussis = 0
+
+        st.markdown("---")
+        st.subheader("🦠 ระดับความเสี่ยงการแพร่ระบาดของโรค")
+        
+        # จัดเรียงแสดงผลกราฟโดนัทเป็นคอลัมน์ (แถวละ 3 และ 2)
+        r_col1, r_col2, r_col3 = st.columns(3)
+        with r_col1:
+            st.plotly_chart(create_donut_chart(risk_flu, "ไข้หวัดใหญ่ (Influenza)"), use_container_width=True)
+        with r_col2:
+            st.plotly_chart(create_donut_chart(risk_rsv, "ไวรัส RSV"), use_container_width=True)
+        with r_col3:
+            st.plotly_chart(create_donut_chart(risk_tb, "วัณโรคปอด (TB)"), use_container_width=True)
+            
+        r_col4, r_col5 = st.columns(2)
+        with r_col4:
+            st.plotly_chart(create_donut_chart(risk_pneumonia, "ปอดอักเสบ / ปอดบวม"), use_container_width=True)
+        with r_col5:
+            st.plotly_chart(create_donut_chart(risk_pertussis, "โรคไอกรน (Pertussis)"), use_container_width=True)
+            
+        st.success("ประมวลผลและวิเคราะห์ความเสี่ยงสำเร็จ!")
+    else:
+        st.error("ยังไม่ได้โหลดโมเดล กรุณาตรวจสอบไฟล์ best.pt")
+
 if option == "อัปโหลดรูปภาพ":
     uploaded_file = st.file_uploader("เลือกไฟล์ภาพ...", type=["jpg", "jpeg", "png"])
-    
     if uploaded_file is not None:
         image = Image.open(uploaded_file)
         image_np = np.array(image)
-
-        if 'model' in globals():
-            # ให้โมเดล YOLOv8 ทำนายผล
-            results = model(image_np)
-            res_plotted = results[0].plot() # วาดกล่อง Bounding Box ลงบนภาพ
-            
-            # แปลงสีจาก BGR เป็น RGB สำหรับแสดงผลบน Streamlit
-            res_plotted_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
-            
-            st.image(res_plotted_rgb, caption="ผลการตรวจจับการสวมหน้ากาก", use_container_width=True)
-            st.success("ประมวลผลสำเร็จ!")
-        else:
-            st.image(image_np, caption="ภาพที่อัปโหลด (ยังไม่ได้โหลดโมเดล)", use_container_width=True)
+        process_and_display(image_np)
 
 elif option == "ถ่ายภาพจากกล้อง":
-    # Widget ถ่ายภาพจากกล้อง
     camera_image = st.camera_input("กดปุ่มเพื่อถ่ายภาพตรวจสอบ")
-
     if camera_image is not None:
         bytes_data = camera_image.getvalue()
         cv2_img = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
-
-        if 'model' in globals():
-            # ประมวลผลด้วยโมเดล YOLOv8
-            results = model(cv2_img)
-            res_plotted = results[0].plot()
-            
-            # แปลงสีแสดงผล
-            res_plotted_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
-            
-            st.image(res_plotted_rgb, caption="ผลการตรวจจับจากกล้อง", use_container_width=True)
-            st.success("ตรวจจับสำเร็จ!")
-        else:
-            st.image(cv2_img, caption="ภาพจากกล้อง (ยังไม่ได้โหลดโมเดล)", use_container_width=True)
+        process_and_display(cv2_img)
