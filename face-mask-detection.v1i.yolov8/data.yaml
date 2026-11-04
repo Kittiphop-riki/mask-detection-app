@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 3
+names: ['mask_weared_incorrect', 'with_mask', 'without_mask']
+
+roboflow:
+  workspace: rikimarus-workspace
+  project: face-mask-detection-tmy8p-ucjuj
+  version: 1
+  license: CC BY 4.0
+  url: https://app.roboflow.com/rikimarus-workspace/face-mask-detection-tmy8p-ucjuj/1
