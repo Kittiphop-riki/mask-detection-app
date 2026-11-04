@@ -28,13 +28,12 @@ def create_donut_chart(percentage, title_text):
     fig = go.Figure(data=[go.Pie(
         values=[percentage, 100 - percentage],
         labels=["ความเสี่ยง", "ปลอดภัย"],
-        hole=0.75,  # ขนาดรูตรงกลางโดนัท
-        marker=dict(colors=['#00a8cc', '#e4e4e4']), # สีฟ้าความเสี่ยง และสีเทาพื้นหลัง
-        textinfo='none', # ไม่แสดงข้อความบนชิ้นเค้ก
+        hole=0.75,
+        marker=dict(colors=['#00a8cc', '#e4e4e4']),
+        textinfo='none',
         hoverinfo='skip'
     )])
     
-    # ใส่ตัวเลขเปอร์เซ็นต์ไว้ตรงกลางวงกลม
     fig.update_layout(
         title_text=title_text,
         title_x=0.5,
@@ -55,9 +54,12 @@ def create_donut_chart(percentage, title_text):
 
 def process_and_display(image_np):
     if 'model' in globals():
-        # ให้โมเดล YOLOv8 ทำนายผล (กำหนด conf=0.1 เพื่อให้ตรวจจับคนด้านหลังหรือตัวเล็กๆ ได้ครบถ้วนขึ้น)
-        results = model(image_np, conf=0.1)
-        res_plotted = results[0].plot() # วาดกล่อง Bounding Box
+        # ปรับ conf=0.05 และเพิ่ม imgsz=640 (หรือ 1280) เพื่อให้จับคนตัวเล็กๆ และระยะไกลได้ดีขึ้น
+        results = model(image_np, conf=0.05, imgsz=640)
+        res_plotted = results[0].plot() # ได้ภาพแบบ BGR จาก YOLO
+        
+        # แก้ปัญหาภาพสีฟ้า: แปลงจาก BGR กลับเป็น RGB ให้ถูกต้องก่อนแสดงผลบน Streamlit
+        res_plotted_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
         
         # นับจำนวนและวิเคราะห์คลาส
         boxes = results[0].boxes
@@ -76,8 +78,7 @@ def process_and_display(image_np):
                     
         total_people = mask_count + no_mask_count
         
-        # แปลงสีสำหรับแสดงผลบน Streamlit
-        res_plotted_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
+        # แสดงรูปภาพที่สีสันปกติแล้ว
         st.image(res_plotted_rgb, caption="ผลการตรวจจับการสวมหน้ากาก", use_container_width=True)
         
         # แสดงผลสรุปจำนวนคน
@@ -104,7 +105,6 @@ def process_and_display(image_np):
         st.markdown("---")
         st.subheader("🦠 ระดับความเสี่ยงการแพร่ระบาดของโรค")
         
-        # จัดเรียงแสดงผลกราฟโดนัทเป็นคอลัมน์ (แถวละ 3 และ 2)
         r_col1, r_col2, r_col3 = st.columns(3)
         with r_col1:
             st.plotly_chart(create_donut_chart(risk_flu, "ไข้หวัดใหญ่ (Influenza)"), use_container_width=True)
