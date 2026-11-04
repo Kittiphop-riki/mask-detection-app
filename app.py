@@ -62,10 +62,10 @@ def process_and_display(image_np):
         # ประมวลผลด้วยโมเดล YOLOv8
         results = model(image_np, conf=0.4, iou=0.45, imgsz=640)
         
-        # ดึงภาพที่มีการวาด Bounding Box (YOLO จะคืนค่าเป็น BGR)
+        # ดึงภาพที่มีการวาด Bounding Box
         res_plotted = results[0].plot()
         
-        # **จุดแก้ไขสำคัญ:** แปลงสีผลลัพธ์จาก BGR เป็น RGB เสมอ เพื่อให้สีถูกต้องบนเว็บ Streamlit ทั้งภาพถ่ายและภาพอัปโหลด
+        # แปลงสีผลลัพธ์จาก BGR เป็น RGB เพื่อให้แสดงผลบนเว็บ Streamlit ได้อย่างถูกต้อง
         res_plotted_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
         
         # ดึงข้อมูล Box และ Classes เพื่อแยกนับ 3 คลาส
@@ -95,7 +95,7 @@ def process_and_display(image_np):
                         
         total_people = sum(counts.values())
         
-        # แสดงผลภาพที่แปลงสีเป็น RGB เรียบร้อยแล้ว สีจะปกติแน่นอน
+        # แสดงผลภาพที่ปรับสีเรียบร้อยแล้ว
         st.image(res_plotted_rgb, caption="ผลการตรวจจับการสวมหน้ากากอนามัย", use_container_width=True)
         
         # แสดงผลสรุปจำนวนคนแยกตามคลาส
@@ -151,7 +151,8 @@ if option == "อัปโหลดรูปภาพ":
     if uploaded_file is not None:
         image = Image.open(uploaded_file)
         image_np = np.array(image)
-        # ส่งภาพเข้าฟังก์ชันตรงๆ แบบเดิมได้เลย
+        # แปลงสี RGB ของภาพอัปโหลดให้เป็น BGR ก่อนเข้ากระบวนการ เพื่อป้องกันสีเพี้ยน
+        image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
         process_and_display(image_np)
 
 elif option == "ถ่ายภาพจากกล้อง":
