@@ -95,7 +95,7 @@ def process_and_display(image_np):
                         
         total_people = sum(counts.values())
         
-        # แสดงผลภาพที่ผ่านการกรองและแปลงสีแล้ว
+        # แสดงผลภาพที่ผ่านการกรองและแปลงสี RGB แล้ว
         st.image(res_plotted_rgb, caption="ผลการตรวจจับการสวมหน้ากากอนามัย", use_container_width=True)
         
         # แสดงผลสรุปจำนวนคนแยกตามคลาส
