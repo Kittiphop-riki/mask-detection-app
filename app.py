@@ -85,7 +85,6 @@ def process_and_display(image_np):
                 if cls_name in counts:
                     counts[cls_name] += 1
                 else:
-                    # กรณีชื่อคลาสเผื่อตรงกับเงื่อนไขคำศัพท์อื่น
                     name_lower = cls_name.lower()
                     if 'incorrect' in name_lower or 'weared_incorrect' in name_lower:
                         counts["mask_weared_incorrect"] += 1
@@ -104,9 +103,9 @@ def process_and_display(image_np):
         st.subheader("📊 สรุปผลการตรวจจับ (Compliance Metrics)")
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("👥 คนทั้งหมด", f"{total_people} คน")
-        col2.metric("✅ สวมถูกต้อง", f\"{counts['with_mask']} คน\")
-        col3.metric("⚠️ สวมไม่ถูกต้อง", f\"{counts['mask_weared_incorrect']} คน\")
-        col4.metric("❌ ไม่สวมหน้ากาก", f\"{counts['no_mask']} คน\")
+        col2.metric("✅ สวมถูกต้อง", f"{counts['with_mask']} คน")
+        col3.metric("⚠️ สวมไม่ถูกต้อง", f"{counts['mask_weared_incorrect']} คน")
+        col4.metric("❌ ไม่สวมหน้ากาก", f"{counts['no_mask']} คน")
         
         # ประเมินความเสี่ยงโรคทางเดินหายใจ (รวมน้ำหนักสวมไม่ถูกต้อง = 0.5)
         if total_people > 0:
