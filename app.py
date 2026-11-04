@@ -54,12 +54,9 @@ def create_donut_chart(percentage, title_text):
 
 def process_and_display(image_np):
     if 'model' in globals():
-        # ปรับ conf=0.05 และเพิ่ม imgsz=640 (หรือ 1280) เพื่อให้จับคนตัวเล็กๆ และระยะไกลได้ดีขึ้น
+        # ให้โมเดล YOLOv8 ทำนายผล (กำหนด conf=0.05 และ imgsz=640 เพื่อให้ตรวจจับคนตัวเล็กหรือไกลได้ดีขึ้น)
         results = model(image_np, conf=0.05, imgsz=640)
-        res_plotted = results[0].plot() # ได้ภาพแบบ BGR จาก YOLO
-        
-        # แก้ปัญหาภาพสีฟ้า: แปลงจาก BGR กลับเป็น RGB ให้ถูกต้องก่อนแสดงผลบน Streamlit
-        res_plotted_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
+        res_plotted = results[0].plot() # วาดกล่อง Bounding Box
         
         # นับจำนวนและวิเคราะห์คลาส
         boxes = results[0].boxes
@@ -78,8 +75,8 @@ def process_and_display(image_np):
                     
         total_people = mask_count + no_mask_count
         
-        # แสดงรูปภาพที่สีสันปกติแล้ว
-        st.image(res_plotted_rgb, caption="ผลการตรวจจับการสวมหน้ากาก", use_container_width=True)
+        # แสดงรูปภาพโดยใช้ res_plotted โดยตรง สีจะไม่เพี้ยนเป็นสีฟ้า
+        st.image(res_plotted, caption="ผลการตรวจจับการสวมหน้ากาก", use_container_width=True)
         
         # แสดงผลสรุปจำนวนคน
         st.markdown("---")
@@ -105,6 +102,7 @@ def process_and_display(image_np):
         st.markdown("---")
         st.subheader("🦠 ระดับความเสี่ยงการแพร่ระบาดของโรค")
         
+        # จัดเรียงแสดงผลกราฟโดนัทเป็นคอลัมน์ (แถวละ 3 และ 2)
         r_col1, r_col2, r_col3 = st.columns(3)
         with r_col1:
             st.plotly_chart(create_donut_chart(risk_flu, "ไข้หวัดใหญ่ (Influenza)"), use_container_width=True)
