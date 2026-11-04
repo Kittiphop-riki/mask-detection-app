@@ -53,7 +53,7 @@ def create_donut_chart(percentage, title_text):
 def process_and_display(image_np):
     if 'model' in globals():
         # ปรับ conf=0.4 และ iou=0.45 เพื่อป้องกันการจับซ้อนกันและกรองผลลัพธ์ที่ผิดพลาดออก
-        results = model(image_np, conf=0.4, iou=0.45, imgsz=640)
+        results = model(image_np, conf=0.1, iou=0.45, imgsz=640)
         
         # ใช้ฟังก์ชัน plot() ของ YOLO โดยตรง ซึ่งจัดการเรื่อง NMS มาให้เรียบร้อยแล้ว ภาพจะไม่ซ้อนกันรกครับ
         res_plotted = results[0].plot()
