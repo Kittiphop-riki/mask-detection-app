@@ -62,8 +62,11 @@ def process_and_display(image_np):
         # ประมวลผลด้วยโมเดล YOLOv8
         results = model(image_np, conf=0.4, iou=0.45, imgsz=640)
         
-        # ดึงภาพที่มีการวาด Bounding Box
+        # ดึงภาพที่มีการวาด Bounding Box (YOLO จะคืนค่าเป็น BGR)
         res_plotted = results[0].plot()
+        
+        # **จุดแก้ไขสำคัญ:** แปลงสีผลลัพธ์จาก BGR เป็น RGB เสมอ เพื่อให้สีถูกต้องบนเว็บ Streamlit ทั้งภาพถ่ายและภาพอัปโหลด
+        res_plotted_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
         
         # ดึงข้อมูล Box และ Classes เพื่อแยกนับ 3 คลาส
         boxes = results[0].boxes
@@ -92,8 +95,8 @@ def process_and_display(image_np):
                         
         total_people = sum(counts.values())
         
-        # แสดงผลภาพ (ใช้ภาพที่โพรเซสมาได้เลย เพราะภาพจากกล้องและภาพอัปโหลดถูกปรับให้ตรงกันแล้ว)
-        st.image(res_plotted, caption="ผลการตรวจจับการสวมหน้ากากอนามัย", use_container_width=True)
+        # แสดงผลภาพที่แปลงสีเป็น RGB เรียบร้อยแล้ว สีจะปกติแน่นอน
+        st.image(res_plotted_rgb, caption="ผลการตรวจจับการสวมหน้ากากอนามัย", use_container_width=True)
         
         # แสดงผลสรุปจำนวนคนแยกตามคลาส
         st.markdown("---")
@@ -148,8 +151,7 @@ if option == "อัปโหลดรูปภาพ":
     if uploaded_file is not None:
         image = Image.open(uploaded_file)
         image_np = np.array(image)
-        # แก้ปัญหาภาพอัปโหลดสีเพี้ยน (แปลงจาก RGB ของ PIL เป็น BGR ให้ถูกต้อง)
-        image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+        # ส่งภาพเข้าฟังก์ชันตรงๆ แบบเดิมได้เลย
         process_and_display(image_np)
 
 elif option == "ถ่ายภาพจากกล้อง":
