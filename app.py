@@ -55,8 +55,8 @@ def create_donut_chart(percentage, title_text):
 
 def process_and_display(image_np):
     if 'model' in globals():
-        # ให้โมเดล YOLOv8 ทำนายผล
-        results = model(image_np)
+        # ให้โมเดล YOLOv8 ทำนายผล (กำหนด conf=0.1 เพื่อให้ตรวจจับคนด้านหลังหรือตัวเล็กๆ ได้ครบถ้วนขึ้น)
+        results = model(image_np, conf=0.1)
         res_plotted = results[0].plot() # วาดกล่อง Bounding Box
         
         # นับจำนวนและวิเคราะห์คลาส
