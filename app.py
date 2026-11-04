@@ -18,12 +18,10 @@ except Exception as e:
 st.title("🏥 Mask Compliance & Disease Risk Assessment")
 st.write("ระบบประเมินความเสี่ยงโรคติดต่อทางเดินหายใจจากพฤติกรรมการสวมหน้ากากอนามัย")
 
-# เมนูด้านข้างสำหรับเลือกโหมดการทำงาน
 option = st.sidebar.selectbox(
     "เลือกวิธีการทดสอบระบบ", ("ถ่ายภาพจากกล้อง", "อัปโหลดรูปภาพ")
 )
 
-# ฟังก์ชันสร้างกราฟวงกลมโดนัทแสดงเปอร์เซ็นต์
 def create_donut_chart(percentage, title_text):
     fig = go.Figure(data=[go.Pie(
         values=[percentage, 100 - percentage],
@@ -54,29 +52,58 @@ def create_donut_chart(percentage, title_text):
 
 def process_and_display(image_np):
     if 'model' in globals():
-        # ให้โมเดล YOLOv8 ทำนายผล (กำหนด conf=0.05 และ imgsz=640 เพื่อให้ตรวจจับคนตัวเล็กหรือไกลได้ดีขึ้น)
-        results = model(image_np, conf=0.05, imgsz=640)
-        res_plotted = results[0].plot() # วาดกล่อง Bounding Box
+        # ปรับ conf เป็น 0.35 เพื่อกรองกล่องขยะ/เสื้อผ้าออก (สามารถปรับขึ้นลงได้ตามความเหมาะสม)
+        results = model(image_np, conf=0.35, imgsz=640)
         
-        # นับจำนวนและวิเคราะห์คลาส
         boxes = results[0].boxes
         class_names = results[0].names
         
+        # กรองเฉพาะกล่องที่น่าจะเป็นใบหน้า/ศีรษะ (กรองกล่องที่อยู่ต่ำเกินไปหรือรูปร่างผิดปกติออก)
+        valid_boxes = []
+        if boxes is not None and len(boxes) > 0:
+            img_h, img_w = image_np.shape[:2]
+            for box in boxes:
+                xyxy = box.xyxy[0].cpu().numpy() # [x1, y1, x2, y2]
+                x1, y1, x2, y2 = xyxy
+                box_height = y2 - y1
+                box_width = x2 - x1
+                
+                # เงื่อนไขกันเสื้อผ้า: หน้ากาก/ใบหน้าส่วนใหญ่ความสูงจะไม่เกิน 40% ของภาพ และอัตราส่วนไม่ควรแปลกประหลาดเกินไป
+                # หากกล่องอยู่ครึ่งล่างของภาพ (y1 > img_h * 0.7) มักจะเป็นเสื้อผ้า ให้ตัดทิ้ง
+                if y1 < (img_h * 0.75):
+                    valid_boxes.append(box)
+
+        # วาดเฉพาะกล่องที่ผ่านการกรองแล้ว
+        # สร้างภาพจำลองผลลัพธ์ใหม่โดยใช้เฉพาะ valid_boxes เพื่อความแม่นยำ
+        annotated_img = image_np.copy()
         mask_count = 0
         no_mask_count = 0
         
-        if boxes is not None and len(boxes) > 0:
-            for cls_id in boxes.cls:
-                name = class_names[int(cls_id)].lower()
-                if 'no' in name or 'without' in name or 'not' in name:
-                    no_mask_count += 1
-                else:
-                    mask_count += 1
-                    
+        for box in valid_boxes:
+            cls_id = int(box.cls[0])
+            conf_val = float(box.conf[0])
+            name = class_names[cls_id].lower()
+            
+            xyxy = box.xyxy[0].cpu().numpy().astype(int)
+            x1, y1, x2, y2 = xyxy
+            
+            # แยกแยะคลาส สวม / ไม่สวม
+            if 'no' in name or 'without' in name or 'not' in name:
+                no_mask_count += 1
+                color = (0, 0, 255) # สีแดงสำหรับไม่ใส่แมส
+            else:
+                mask_count += 1
+                color = (0, 255, 0) # สีเขียวสำหรับใส่แมส
+                
+            # วาดกรอบและข้อความบนภาพ
+            cv2.rectangle(annotated_img, (x1, y1), (x2, y2), color, 2)
+            label = f"{name} {conf_val:.2f}"
+            cv2.putText(annotated_img, label, (x1, max(y1 - 10, 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
         total_people = mask_count + no_mask_count
         
-        # แสดงรูปภาพโดยใช้ res_plotted โดยตรง สีจะไม่เพี้ยนเป็นสีฟ้า
-        st.image(res_plotted, caption="ผลการตรวจจับการสวมหน้ากาก", use_container_width=True)
+        # แสดงผลภาพ
+        st.image(annotated_img, caption="ผลการตรวจจับการสวมหน้ากาก (กรองเสื้อผ้าออกแล้ว)", use_container_width=True)
         
         # แสดงผลสรุปจำนวนคน
         st.markdown("---")
@@ -86,7 +113,7 @@ def process_and_display(image_np):
         col2.metric("✅ สวมหน้ากาก", f"{mask_count} คน")
         col3.metric("❌ ไม่สวมหน้ากาก", f"{no_mask_count} คน")
         
-        # ประเมินความเสี่ยงโรคทางเดินหายใจ (คำนวณเป็นเปอร์เซ็นต์ 0-100)
+        # ประเมินความเสี่ยงโรคทางเดินหายใจ
         if total_people > 0:
             unmasked_ratio = no_mask_count / total_people
             base_risk = int(unmasked_ratio * 100)
@@ -102,7 +129,6 @@ def process_and_display(image_np):
         st.markdown("---")
         st.subheader("🦠 ระดับความเสี่ยงการแพร่ระบาดของโรค")
         
-        # จัดเรียงแสดงผลกราฟโดนัทเป็นคอลัมน์ (แถวละ 3 และ 2)
         r_col1, r_col2, r_col3 = st.columns(3)
         with r_col1:
             st.plotly_chart(create_donut_chart(risk_flu, "ไข้หวัดใหญ่ (Influenza)"), use_container_width=True)
